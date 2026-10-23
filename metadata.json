@@ -1,0 +1,6 @@
+{
+  "name": "무인교통단속장비 경찰규격서 (KPS-08-0004-02: 2026)",
+  "description": "경찰청 교통안전과 무인교통단속장비 경찰규격서(2026.02.25 개정) 디지털 기술 규격 포털 및 성능검사 판정 계산기, 통신 프로토콜 인스펙터",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
