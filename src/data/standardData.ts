@@ -1,5 +1,4 @@
 import {
-  SpecChapter,
   EnforcementFunction,
   OpcodeItem,
   PoliceAgencyCode,
@@ -616,7 +615,7 @@ export const DURABILITY_TESTS: DurabilityTestSpec[] = [
     applicable: { fixed: true, mobile: true },
     sampleRatio: '전수검사 (100%)',
     method: '함체·케이스류 도색 및 인쇄상태, 단자 결선, 나사 조임, 배선 규격, 명판 부착, 끝손질 등 육안 및 촉수 검사',
-    criteria: '도장 벗겨짐, 결선 불량, 헐거움, 마감 결함 등 외관상 결함이 일체 없을 것 (<표 175>)',
+    criteria: '도장 벗겨짐, 결선 불량, 헐거움, 마감 결함 등 외관상 결함이 일체 없을 것 (표 175)',
   },
   {
     id: 'function',
@@ -634,7 +633,7 @@ export const DURABILITY_TESTS: DurabilityTestSpec[] = [
     applicable: { fixed: true, mobile: true },
     sampleRatio: '기능검사 합격장비의 20%',
     method: '챔버 -30℃, 함체 문 개방, 습도 OFF 상태에서 정격하한전압(AC 190V) 인가 5시간 지속 후 전원 차단/복구 시험',
-    criteria: '전원 복구 후 정상 부팅 및 영상취득, 조명, 팬틸트 기능 만족 수행 (<그림 61>)',
+    criteria: '전원 복구 후 정상 부팅 및 영상취득, 조명, 팬틸트 기능 만족 수행',
   },
   {
     id: 'env_cold_high',
@@ -756,49 +755,4 @@ export const SIGNAGE_DISTANCE_RULES: SignageDistanceRule[] = [
   { roadType: '국도 / 간선도로 (60km/h)', speedLimit: '60 km/h', firstNoticeDist: '1.0 km', secondNoticeDist: '250 m', note: '기본형 1배 (70×110cm) 적용' },
   { roadType: '어린이/노인 보호구역 (50km/h 이하)', speedLimit: '50 km/h 이하', firstNoticeDist: '0.45 km (450m)', secondNoticeDist: '150 m', note: '보호구역 시작표지 지점에 1차 예고표지 설치' },
   { roadType: '보호구역 (30km/h 스쿨존)', speedLimit: '30 km/h', firstNoticeDist: '0.45 km (450m)', secondNoticeDist: '150 m', note: '시간제 속도운영 구간 최고제한속도 보조표지 병행' },
-];
-
-export const DB_TABLE_CATEGORIES = [
-  {
-    category: '위반 및 고지 마스터',
-    tables: [
-      { name: '위반정보 마스터 테이블 (차적정보 포함)', desc: '단속된 차량 번호, 위반코드, 속도, 사진경로, 차적조회 결과 영구/5년 저장' },
-      { name: '위반정보 마스터 테이블 변경내역', desc: '운영자 또는 판독관에 의한 위반정보 변경 이력' },
-      { name: '위반정보 마스터 테이블 필터내역', desc: '중복 단속, 오류 번호판 등 자동 필터링 로그' },
-      { name: '위반정보 마스터 테이블 5년 삭제', desc: '과태료 납부 및 소송 종결 후 5년 경과 파기 테이블' },
-      { name: '제어기별 고지일련번호 테이블', desc: '경찰서별/제어기별 위반사실통지서 발행 번호 채번' },
-      { name: '제어기 위반장소 / 위반주소 테이블', desc: '현장 제어기 설치 지점 도로명 및 행정구역 주소' },
-      { name: '우편번호 마스터 테이블', desc: '차적지 주소 기반 고지서 발송용 우편번호 매핑' },
-    ],
-  },
-  {
-    category: '가상제어기 & 구간단속 관리',
-    tables: [
-      { name: '가상제어기 정보 마스터 테이블', desc: '구간속도위반 단속을 위한 시점-종점 가상 제어기 묶음 정의' },
-      { name: '가상제어기-제어기 매칭 마스터 테이블', desc: '물리 제어기와 가상제어기 간 매핑 및 구간거리(m) 설정' },
-      { name: '가상제어기 지점/구간 위반정보 테이블', desc: '구간 통행속도 계산 및 지점 속도위반 통합 저장' },
-      { name: '가상제어기 지점/구간 통과정보 테이블', desc: '구간 통과차량 번호판 매칭 및 21일 보관' },
-      { name: '가상제어기 시각상태 / 초기 IP상태 테이블', desc: '시·종점 제어기간 NTP 동기화 오차 감시 로그' },
-    ],
-  },
-  {
-    category: '현장 제어기 운영 & 파라미터',
-    tables: [
-      { name: '제어기정보 마스터', desc: 'LOCAL NUMBER, 설치위치, 제작사, 납품일, IP, 통신포트 관리' },
-      { name: '제어기 상태 정보', desc: '함체온도, 도어센서, 팬/히터, 카메라 모듈 상태 수신 이력' },
-      { name: '제어기 교통 정보', desc: '5분 주기 차로별 통과교통량, 평균속도, 점유율 집계 데이터' },
-      { name: '제어기 가림막 정보', desc: '개인정보보호를 위한 조수석 가림막 처리 좌표' },
-      { name: '시스템 환경 설정 마스터 / 파라미터 관리 테이블', desc: '제한속도, 단속속도, 차로별 단속모드 원격 파라미터' },
-      { name: '공휴일 관리 / 방학 관리 테이블', desc: '시간제 단속 예외 적용을 위한 캘린더' },
-    ],
-  },
-  {
-    category: '관제 & 시스템 모니터링',
-    tables: [
-      { name: '제어기별 / 경찰서별 / 초과속도별 위반 통계', desc: '시간대별, 차로별, 속도대별 단속 건수 다차원 통계' },
-      { name: '운영자 관리 마스터 & 화면 권한 테이블', desc: '무인영상실 사용자 ID, 패스워드 암호화, 접근 권한' },
-      { name: '서버별 타스크 / 메모리 / 디스크 상태 테이블', desc: '통신서버, DB서버, 백업 데몬 실시간 시스템 헬스 관제' },
-      { name: '업다운 타스크 & 파일 관리 테이블', desc: '원격 펌웨어 배포, 파라미터 다운로드, 로그 파일 수집 상태' },
-    ],
-  },
 ];

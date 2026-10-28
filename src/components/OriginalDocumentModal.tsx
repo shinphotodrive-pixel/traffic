@@ -1,76 +1,74 @@
 import React from 'react';
-import { X, Download, ExternalLink, FileText, CheckCircle2 } from 'lucide-react';
 import { DOCUMENT_META } from '../data/standardData';
+import { X, ExternalLink, Download, FileText } from 'lucide-react';
 
 interface OriginalDocumentModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-export const OriginalDocumentModal: React.FC<OriginalDocumentModalProps> = ({ isOpen, onClose }) => {
+export const OriginalDocumentModal: React.FC<OriginalDocumentModalProps> = ({
+  isOpen,
+  onClose,
+}) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
-      <div className="relative w-full max-w-5xl h-[85vh] bg-white rounded-xl shadow-2xl flex flex-col border border-slate-200 overflow-hidden">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-5xl h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/90">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
-              <FileText className="w-4 h-4" />
+            <div className="p-2 rounded-lg bg-blue-500/20 text-blue-400">
+              <FileText className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">
-                {DOCUMENT_META.title} 원문 PDF
-              </h2>
-              <p className="text-xs text-slate-500">
-                규격번호: {DOCUMENT_META.standardNumber} · 제정기관: {DOCUMENT_META.authority} · 개정일: {DOCUMENT_META.latestDate}
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                경찰청 경찰규격서 원문 PDF 뷰어
+                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-mono">
+                  총 210쪽 원본 문서
+                </span>
+              </h3>
+              <p className="text-xs text-slate-400">
+                {DOCUMENT_META.standardNumber} ({DOCUMENT_META.latestDate} 개정) | 경찰청 교통안전과
               </p>
             </div>
           </div>
+
           <div className="flex items-center gap-2">
             <a
               href={DOCUMENT_META.pdfPath}
-              download="무인교통단속장비_경찰규격서_KPS-08-0004-02_2026.pdf"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 transition-colors"
+              download="경찰청_무인교통단속장비_경찰규격서_2026.pdf"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg border border-slate-700 transition"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>PDF 다운로드</span>
+              <Download className="w-3.5 h-3.5 text-blue-400" />
+              다운로드
             </a>
             <a
               href={DOCUMENT_META.pdfPath}
               target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg transition"
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              <span>새 창에서 열기</span>
+              새 탭으로 열기
             </a>
             <button
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition ml-2"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* PDF Embedded Frame */}
-        <div className="flex-1 bg-slate-100 relative">
+        {/* PDF Embed */}
+        <div className="flex-1 bg-slate-950 p-2">
           <iframe
-            src={`${DOCUMENT_META.pdfPath}#view=FitH`}
-            className="w-full h-full border-none"
-            title="경찰청 규격서 원문 PDF"
+            src={`${DOCUMENT_META.pdfPath}#toolbar=1&navpanes=1`}
+            className="w-full h-full rounded-xl border border-slate-800"
+            title="경찰규격서 원본 PDF"
           />
-        </div>
-
-        {/* Modal Footer Note */}
-        <div className="px-6 py-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>총 210페이지 도로교통법 제4조의2 경찰청 공인 표준규격 원본 문서</span>
-          </div>
-          <span className="text-slate-400 font-mono">MD5 Checksum Verified</span>
         </div>
       </div>
     </div>

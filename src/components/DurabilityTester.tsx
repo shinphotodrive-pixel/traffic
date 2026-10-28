@@ -1,278 +1,263 @@
 import React, { useState } from 'react';
+import { DURABILITY_TESTS, SYSTEM_ABNORMAL_ITEMS } from '../data/standardData';
 import {
   ThermometerSnowflake,
-  Activity,
-  Droplets,
-  Zap,
-  Sparkles,
   ShieldCheck,
+  Zap,
+  Activity,
+  AlertTriangle,
+  Layers,
+  Clock,
   CheckCircle2,
-  Info,
-  Flame,
-  Clock
 } from 'lucide-react';
-import { DURABILITY_TESTS } from '../data/standardData';
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  ReferenceLine,
+} from 'recharts';
 
 export const DurabilityTester: React.FC = () => {
-  const [activeStep, setActiveStep] = useState<number>(1);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<'chamber' | 'specs' | 'abnormal'>('chamber');
 
-  const chamberSteps = [
-    {
-      step: 1,
-      title: '시험 시작 및 저온 냉각',
-      temp: '상온 ➔ -30 ℃',
-      duration: '최소 3시간',
-      voltage: 'AC 220V (정격)',
-      door: '챔버 닫힘 / 함체문 개방',
-      humidity: 'OFF',
-      action: '챔버 내부 온도를 -30℃까지 서서히 냉각 안정화',
-    },
-    {
-      step: 2,
-      title: '저온 저전압 시험',
-      temp: '-30 ℃ 유지',
-      duration: '5시간 지속 + 전원차단 복구',
-      voltage: 'AC 190V (정격하한전압)',
-      door: '함체문 열림',
-      humidity: 'OFF',
-      action: '5시간 지속 후 5시간 전원 차단 후 전원 복구 정상 부팅 확인. 트리거 영상취득 및 조명 기능 검증.',
-    },
-    {
-      step: 3,
-      title: '저온 고전압 시험',
-      temp: '-30 ℃ 유지',
-      duration: '약 1시간 동작',
-      voltage: 'AC 250V (정격상한전압)',
-      door: '함체문 열림',
-      humidity: 'OFF',
-      action: '상한전압 인가 상태에서 연속 트리거 영상 취득 및 팬틸트 작동 점검.',
-    },
-    {
-      step: 4,
-      title: '고온 승온 단계',
-      temp: '-30 ℃ ➔ 60 ℃',
-      duration: '최소 6시간',
-      voltage: 'AC 220V',
-      door: '함체문 열림',
-      humidity: '상대습도 18%',
-      action: '시간당 17℃씩 일정하게 승온시켜 열충격을 방지하며 60℃ 도달.',
-    },
-    {
-      step: 5,
-      title: '고온 고전압 시험',
-      temp: '60 ℃ 고온',
-      duration: '약 15시간 시험',
-      voltage: 'AC 250V (정격상한전압)',
-      door: '함체문 열림',
-      humidity: '상대습도 18% (최고 95% 초과 금지)',
-      action: '극심한 열기 환경에서 연속 동작 및 부품 열화 상태 점검.',
-    },
-    {
-      step: 6,
-      title: '고온 저전압 시험',
-      temp: '60 ℃ 고온',
-      duration: '약 1시간 동작',
-      voltage: 'AC 190V (정격하한전압)',
-      door: '함체문 열림',
-      humidity: '상대습도 18%',
-      action: '고온 상태에서 최저 입력 전압 인가 시 정상 동작 여부 확인.',
-    },
-    {
-      step: 7,
-      title: '실온 복귀 및 정상상태 시험 (종료)',
-      temp: '실온 (15 ℃ ~ 27 ℃)',
-      duration: '약 1시간 적응',
-      voltage: 'AC 220V (정격)',
-      door: '정상 상태',
-      humidity: 'OFF',
-      action: '정상 전압 인가 및 1시간 안정화 후 최종 트리거·조명·팬틸트 정상 검증.',
-    },
+  // Chamber 16-hour profile data
+  // -30°C ~ +60°C cycle according to Chapter IV
+  const chamberData = [
+    { hour: '0h', temp: 25, stage: '상온 안정화 (25℃)' },
+    { hour: '2h', temp: -30, stage: '급속 저온 강하 (-30℃)' },
+    { hour: '4h', temp: -30, stage: '극한 저온 유지 (-30℃ 2시간 유지)' },
+    { hour: '5h', temp: -30, stage: '저온 시동 및 촬영 기능 시험' },
+    { hour: '7h', temp: 0, stage: '승온 과정' },
+    { hour: '9h', temp: 25, stage: '상온 복귀 (25℃)' },
+    { hour: '11h', temp: 60, stage: '고온 승온 (+60℃)' },
+    { hour: '13h', temp: 60, stage: '극한 고온 유지 (+60℃ 2시간 유지)' },
+    { hour: '14h', temp: 60, stage: '고온 연속 연속단속 부하 시험' },
+    { hour: '15h', temp: 35, stage: '상온 강하' },
+    { hour: '16h', temp: 25, stage: '시험 종료 및 상온 복원력 검증' },
   ];
 
-  const filteredTests = DURABILITY_TESTS.filter(
-    (t) => selectedCategory === 'all' || t.category === selectedCategory
-  );
-
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Title */}
-      <div className="mb-8">
-        <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 mb-1">
-          <span>제Ⅴ장 무인교통단속장비 내구성 시험</span>
-          <span>·</span>
-          <span>한국도로교통공단 / KOLAS 인정기관 시험성적서 필수</span>
-        </div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-          내구성 시험 규격 & 16시간 환경시험 프로파일
-        </h1>
-        <p className="text-sm text-slate-600 mt-1">
-          -30℃ 저온부터 60℃ 고온까지 온습도·전압 복합 챔버 시험 사이클 및 진동, 살수 방수, 전기 서지 규격
-        </p>
-      </div>
-
-      {/* Interactive Chamber Temperature & Voltage Profile Visualizer (<그림 61>) */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6 mb-8 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 mb-6">
+    <div className="space-y-6">
+      {/* Top Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-cyan-600/20 text-cyan-400 rounded-xl border border-cyan-500/30">
+            <ThermometerSnowflake className="w-6 h-6" />
+          </div>
           <div>
-            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <ThermometerSnowflake className="w-5 h-5 text-blue-600" />
-              환경시험 온·습도 및 전압 진행순서 (총 16시간 PROFILE, 그림 61)
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              단계별 클릭하여 챔버 온도, 입력 전압(190V/220V/250V), 함체 도어 상태 및 세부 시험 방법을 확인하세요.
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              환경시험 및 내구성 기준 (제4장 시험방법)
+              <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono">
+                16시간 -30℃~+60℃ 챔버 시험
+              </span>
+            </h2>
+            <p className="text-xs text-slate-400">
+              극한 온·습도, 진동(KS C 0220), 방수(IP66), 서지내성 6kV 등 경찰청 인증 필수 내구성 규격
             </p>
           </div>
-          <span className="text-xs font-mono bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-semibold">
-            -30 ℃ ~ +60 ℃
-          </span>
         </div>
 
-        {/* Graphical Timeline Step Selector */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-6">
-          {chamberSteps.map((s) => {
-            const isSelected = activeStep === s.step;
-            return (
-              <button
-                key={s.step}
-                onClick={() => setActiveStep(s.step)}
-                className={`text-left p-3 rounded-lg border transition-all ${
-                  isSelected
-                    ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
-                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-mono font-bold opacity-75">
-                    STEP {s.step}
-                  </span>
-                  <span className={`text-[10px] font-mono ${isSelected ? 'text-blue-300' : 'text-blue-600'}`}>
-                    {s.duration}
-                  </span>
-                </div>
-                <div className="text-xs font-bold truncate">{s.title}</div>
-                <div className={`text-[11px] font-mono mt-1 ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
-                  {s.temp}
-                </div>
-              </button>
-            );
-          })}
+        {/* Tab switcher */}
+        <div className="flex rounded-lg bg-slate-800 p-0.5 border border-slate-700 text-xs">
+          <button
+            onClick={() => setActiveTab('chamber')}
+            className={`px-3 py-1.5 rounded-md transition ${
+              activeTab === 'chamber' ? 'bg-cyan-600 text-white font-bold' : 'text-slate-400'
+            }`}
+          >
+            온도 챔버 프로파일
+          </button>
+          <button
+            onClick={() => setActiveTab('specs')}
+            className={`px-3 py-1.5 rounded-md transition ${
+              activeTab === 'specs' ? 'bg-cyan-600 text-white font-bold' : 'text-slate-400'
+            }`}
+          >
+            7대 내구성 시험항목
+          </button>
+          <button
+            onClick={() => setActiveTab('abnormal')}
+            className={`px-3 py-1.5 rounded-md transition ${
+              activeTab === 'abnormal' ? 'bg-cyan-600 text-white font-bold' : 'text-slate-400'
+            }`}
+          >
+            시스템 이상감지 (11종)
+          </button>
         </div>
+      </div>
 
-        {/* Active Step Detailed Specifications Board */}
-        {(() => {
-          const cur = chamberSteps.find((s) => s.step === activeStep) || chamberSteps[0];
-          return (
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 mb-4">
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">
-                    {cur.step}
-                  </span>
-                  <h4 className="text-sm font-bold text-slate-900">{cur.title}</h4>
-                </div>
-                <div className="flex items-center gap-3 text-xs font-mono text-slate-600">
-                  <span className="flex items-center gap-1 font-semibold text-blue-700">
-                    <Clock className="w-3.5 h-3.5" /> {cur.duration}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs mb-4">
-                <div>
-                  <span className="text-slate-400 block mb-0.5">챔버 시험 온도</span>
-                  <span className="font-bold font-mono text-slate-900 text-sm">{cur.temp}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block mb-0.5">인가 전압 (AC)</span>
-                  <span className="font-bold font-mono text-blue-700 text-sm">{cur.voltage}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block mb-0.5">챔버 및 함체 도어</span>
-                  <span className="font-semibold text-slate-800">{cur.door}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block mb-0.5">습도 제어 조건</span>
-                  <span className="font-semibold text-slate-800">{cur.humidity}</span>
-                </div>
-              </div>
-
-              <p className="text-xs text-slate-700 bg-white border border-slate-200/80 rounded-lg p-3 leading-relaxed">
-                <strong className="text-slate-900">검사 내용 및 절차: </strong>
-                {cur.action}
+      {/* Tab 1: Chamber Graph */}
+      {activeTab === 'chamber' && (
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-2">
+            <div>
+              <h3 className="text-base font-bold text-white">
+                16시간 극한 환경 챔버 시험 사이클 (그림 13 규격)
+              </h3>
+              <p className="text-xs text-slate-400">
+                -30℃에서 +60℃까지 단계별 온도 변화 하에서 장비 오동작 유무와 데이터 손실 0건을 검증합니다.
               </p>
             </div>
-          );
-        })()}
-      </div>
-
-      {/* 7 Durability Test Items Category Selector & Cards */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 mb-6">
-          <div>
-            <h3 className="text-base font-bold text-slate-900">
-              7대 내구성 시험 규격 세부 항목 (표 173 ~ 표 175)
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              외관 전수검사, 기능, 챔버 온습도, 진동(공진/내구/스윕), 살수 방수, 전기 서지, IR LED 광학 시험
-            </p>
+            <div className="flex items-center gap-3 text-xs">
+              <span className="flex items-center gap-1.5 text-cyan-400">
+                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+                최저 저온: -30℃
+              </span>
+              <span className="flex items-center gap-1.5 text-rose-400">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-400"></span>
+                최고 고온: +60℃
+              </span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg shrink-0 overflow-x-auto">
-            {['all', '외관', '기능', '환경', '진동', '내수성', '전기', '광학'].map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
-                  selectedCategory === cat
-                    ? 'bg-white text-slate-900 shadow-2xs font-semibold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                {cat === 'all' ? '전체' : cat}
-              </button>
-            ))}
+          <div className="h-72 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chamberData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <CartesianGrid stroke="#334155" strokeDasharray="3 3" />
+                <XAxis dataKey="hour" stroke="#94a3b8" tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                <YAxis
+                  domain={[-40, 70]}
+                  stroke="#94a3b8"
+                  tick={{ fill: '#94a3b8', fontSize: 12 }}
+                  unit="℃"
+                />
+                <ReferenceLine y={0} stroke="#64748b" strokeDasharray="2 2" />
+                <ReferenceLine y={-30} stroke="#38bdf8" label={{ value: '저온 한계 -30℃', fill: '#38bdf8', fontSize: 10 }} />
+                <ReferenceLine y={60} stroke="#f43f5e" label={{ value: '고온 한계 +60℃', fill: '#f43f5e', fontSize: 10 }} />
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-slate-950 border border-slate-700 p-3 rounded-lg shadow-xl text-xs">
+                          <p className="font-bold text-white mb-1">경과 시간: {data.hour}</p>
+                          <p className="text-cyan-400 font-mono font-bold text-sm">
+                            챔버 온도: {data.temp} ℃
+                          </p>
+                          <p className="text-slate-400 mt-1">{data.stage}</p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="temp"
+                  stroke="#06b6d4"
+                  strokeWidth={3}
+                  dot={{ fill: '#06b6d4', r: 5 }}
+                  activeDot={{ r: 8 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Test Stage milestones */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+              <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider block">1단계: 저온 시험</span>
+              <strong className="text-sm text-white mt-1 block">-30℃ 저온 시동 & 촬영</strong>
+              <p className="text-xs text-slate-400 mt-1">
+                챔버 -30℃ 도달 후 2시간 이상 유지 상태에서 전원 재투입 시동 및 60프레임 연속 캡처 성공
+              </p>
+            </div>
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+              <span className="text-[10px] text-rose-400 font-bold uppercase tracking-wider block">2단계: 고온 시험</span>
+              <strong className="text-sm text-white mt-1 block">+60℃ 고온 지속 부하</strong>
+              <p className="text-xs text-slate-400 mt-1">
+                +60℃ 열기 속에서 CPU 쓰로틀링 없이 신경망 가속기 번호인식 모듈 정상 연산 유지
+              </p>
+            </div>
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+              <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider block">3단계: 복원력 검증</span>
+              <strong className="text-sm text-white mt-1 block">상온 복귀 후 무결성</strong>
+              <p className="text-xs text-slate-400 mt-1">
+                25℃ 상온 안정화 후 플래시 메모리 저장 이미지의 SHA-256 해시값 변조 및 손실 0건 입증
+              </p>
+            </div>
           </div>
         </div>
+      )}
 
-        {/* Test Items Grid */}
+      {/* Tab 2: 7 Durability Specs */}
+      {activeTab === 'specs' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredTests.map((test) => (
+          {DURABILITY_TESTS.map((spec) => (
             <div
-              key={test.id}
-              className="border border-slate-200 rounded-xl p-4 hover:border-slate-300 transition-all bg-slate-50/40"
+              key={spec.id}
+              className="bg-slate-900/90 border border-slate-800 rounded-xl p-5 shadow-lg space-y-3"
             >
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-blue-100 text-blue-800">
-                    {test.category}
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300">
+                    {spec.category}
                   </span>
-                  <h4 className="text-sm font-bold text-slate-900">{test.name}</h4>
+                  <h4 className="text-sm font-bold text-white">{spec.name}</h4>
                 </div>
-                <span className="text-[11px] font-mono text-slate-500 bg-white px-2 py-0.5 border border-slate-200 rounded">
-                  {test.sampleRatio}
+                <span className="text-[11px] font-mono text-slate-400">
+                  {spec.standardsRef || '경찰규격'}
                 </span>
               </div>
 
-              <div className="space-y-2 text-xs text-slate-700 mt-3">
+              <div className="space-y-1.5 text-xs text-slate-300">
                 <div>
-                  <span className="text-slate-400 font-semibold block">시험 방법</span>
-                  <p className="text-slate-800 mt-0.5 leading-relaxed">{test.method}</p>
+                  <span className="text-slate-500 font-medium">시험 방법: </span>
+                  <span>{spec.method}</span>
                 </div>
                 <div>
-                  <span className="text-emerald-700 font-semibold block">합격 판정 기준</span>
-                  <p className="text-slate-900 font-medium mt-0.5 leading-relaxed">{test.criteria}</p>
+                  <span className="text-slate-500 font-medium">합격 기준: </span>
+                  <span className="text-emerald-400 font-semibold">{spec.criteria}</span>
                 </div>
-                {test.standardsRef && (
-                  <div className="pt-2 border-t border-slate-200/60 text-[11px] text-slate-500 font-mono">
-                    관련 규격: {test.standardsRef}
-                  </div>
-                )}
+                <div>
+                  <span className="text-slate-500 font-medium">표본 추출: </span>
+                  <span className="text-slate-400">{spec.sampleRatio}</span>
+                </div>
               </div>
             </div>
           ))}
         </div>
-      </div>
+      )}
+
+      {/* Tab 3: 11 System Abnormal Items */}
+      {activeTab === 'abnormal' && (
+        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-5 shadow-lg space-y-4">
+          <div>
+            <h3 className="text-base font-bold text-white">
+              경찰청 표준 시스템 이상상태 감지 규격 11종 (표 172)
+            </h3>
+            <p className="text-xs text-slate-400">
+              무인단속장비가 자가진단하여 센터통신서버로 긴급 알림(OPCODE 0x31)을 송신해야 하는 장애 항목
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {SYSTEM_ABNORMAL_ITEMS.map((item) => (
+              <div
+                key={item.no}
+                className="p-3.5 bg-slate-950/80 rounded-xl border border-slate-800 space-y-1.5"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-amber-400">
+                    장애코드 #{item.no.toString().padStart(2, '0')}
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">
+                    {item.appliesTo}
+                  </span>
+                </div>
+                <h4 className="text-xs font-bold text-white">{item.title}</h4>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  {item.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

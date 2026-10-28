@@ -65,14 +65,6 @@ export interface OpcodeItem {
   server: '지역제어장치' | '센터통신서버';
   direction: string;
   description: string;
-  requestPacket?: {
-    lengthDesc: string;
-    fields: { name: string; size: string; type: string; desc: string }[];
-  };
-  responsePacket?: {
-    lengthDesc: string;
-    fields: { name: string; size: string; type: string; desc: string }[];
-  };
 }
 
 export interface PoliceAgencyCode {
@@ -112,4 +104,21 @@ export interface SignageDistanceRule {
   firstNoticeDist: string;
   secondNoticeDist: string;
   note?: string;
+}
+
+// 2026 Header Verification Types
+export interface HeaderValidationResult {
+  isValid: boolean;
+  score: number; // 0 ~ 100
+  totalChecks: number;
+  passedChecks: number;
+  errors: string[];
+  warnings: string[];
+  fields: {
+    name: string;
+    expected: string;
+    actual: string;
+    status: 'pass' | 'fail' | 'warn';
+    description: string;
+  }[];
 }

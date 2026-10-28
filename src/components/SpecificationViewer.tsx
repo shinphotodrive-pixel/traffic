@@ -1,461 +1,407 @@
-import React, { useState, useMemo } from 'react';
-import {
-  Search,
-  BookOpen,
-  Calendar,
-  ChevronRight,
-  Bookmark,
-  BookmarkCheck,
-  Copy,
-  Check,
-  Table as TableIcon,
-  ShieldCheck,
-  SlidersHorizontal,
-  ExternalLink
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 import { SPEC_CHAPTERS } from '../data/standardChapters';
 import { DOCUMENT_META } from '../data/standardData';
-import { SpecChapter, SpecSection } from '../types/standard';
+import {
+  BookOpen,
+  Search,
+  ChevronRight,
+  Bookmark,
+  ExternalLink,
+  Table,
+  CheckCircle,
+  X,
+  Filter,
+  Layers,
+  Sparkles,
+  ArrowRight,
+  ShieldCheck,
+} from 'lucide-react';
 
 interface SpecificationViewerProps {
   onOpenPdf: () => void;
-  onNavigateToTab: (tab: string) => void;
+  initialChapterId?: string;
+  initialSectionId?: string;
+  onClearInitialSection?: () => void;
 }
+
+type EquipmentFilterType = 'all' | 'fixed' | 'mobile' | 'vehicle' | 'drone' | 'protocol';
+
+const EQUIPMENT_TAGS: { id: EquipmentFilterType; label: string }[] = [
+  { id: 'all', label: '전체 조항' },
+  { id: 'fixed', label: '고정식' },
+  { id: 'mobile', label: '이동식' },
+  { id: 'vehicle', label: '차량탑재형' },
+  { id: 'drone', label: '드론탑재형' },
+  { id: 'protocol', label: '통신·보안' },
+];
+
+const SUGGESTED_KEYWORDS = [
+  '속도오차',
+  '신호위반',
+  '표 159',
+  '시스템 비정상',
+  '22바이트',
+  '10초 녹화',
+  '스테인리스',
+  '16시간 챔버',
+  '안내표지',
+];
 
 export const SpecificationViewer: React.FC<SpecificationViewerProps> = ({
   onOpenPdf,
-  onNavigateToTab,
+  initialChapterId,
+  initialSectionId,
 }) => {
+  const [selectedChapterId, setSelectedChapterId] = useState(initialChapterId || SPEC_CHAPTERS[0].id);
+  const [selectedSectionId, setSelectedSectionId] = useState(
+    initialSectionId || SPEC_CHAPTERS[0].sections[0]?.id || ''
+  );
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedChapterId, setSelectedChapterId] = useState<string>(SPEC_CHAPTERS[0].id);
-  const [selectedSectionId, setSelectedSectionId] = useState<string>(SPEC_CHAPTERS[0].sections[0].id);
-  const [bookmarks, setBookmarks] = useState<string[]>(['ch2-3', 'ch3-3', 'ch4-1']);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [showRevisionHistory, setShowRevisionHistory] = useState(false);
+  const [selectedEquipment, setSelectedEquipment] = useState<EquipmentFilterType>('all');
+  const [bookmarkedSections, setBookmarkedSections] = useState<string[]>(['sec_1_1', 'sec_3_1']);
+  const [highlightPulse, setHighlightPulse] = useState(false);
 
-  // Search filter
-  const searchResults = useMemo(() => {
-    if (!searchQuery.trim()) return null;
-    const q = searchQuery.toLowerCase().trim();
-    const results: { chapter: SpecChapter; section: SpecSection; matches: string[] }[] = [];
+  // Sync when initial chapter/section props change (e.g. from Calculator or search navigation)
+  useEffect(() => {
+    if (initialChapterId) {
+      setSelectedChapterId(initialChapterId);
+    }
+    if (initialSectionId) {
+      setSelectedSectionId(initialSectionId);
+      setHighlightPulse(true);
+      const timer = setTimeout(() => setHighlightPulse(false), 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [initialChapterId, initialSectionId]);
 
-    SPEC_CHAPTERS.forEach((chapter) => {
-      chapter.sections.forEach((section) => {
-        const matches: string[] = [];
-        if (section.title.toLowerCase().includes(q)) matches.push(`제목: ${section.title}`);
-        if (section.summary.toLowerCase().includes(q)) matches.push(`요약: ${section.summary}`);
-        section.content.forEach((line) => {
-          if (line.toLowerCase().includes(q)) {
-            matches.push(line);
-          }
-        });
-        if (section.tables) {
-          section.tables.forEach((t) => {
-            if (t.title.toLowerCase().includes(q)) matches.push(`표: ${t.title}`);
-          });
-        }
-        if (matches.length > 0) {
-          results.push({ chapter, section, matches: matches.slice(0, 3) });
-        }
-      });
-    });
-    return results;
-  }, [searchQuery]);
+  const activeChapter = SPEC_CHAPTERS.find((c) => c.id === selectedChapterId) || SPEC_CHAPTERS[0];
+  const activeSection =
+    activeChapter.sections.find((s) => s.id === selectedSectionId) ||
+    activeChapter.sections[0];
 
-  const currentChapter = SPEC_CHAPTERS.find((c) => c.id === selectedChapterId) || SPEC_CHAPTERS[0];
-  const currentSection =
-    currentChapter.sections.find((s) => s.id === selectedSectionId) || currentChapter.sections[0];
-
-  const toggleBookmark = (id: string) => {
-    setBookmarks((prev) =>
-      prev.includes(id) ? prev.filter((b) => b !== id) : [...prev, id]
+  const toggleBookmark = (secId: string) => {
+    setBookmarkedSections((prev) =>
+      prev.includes(secId) ? prev.filter((id) => id !== secId) : [...prev, secId]
     );
   };
 
-  const handleCopyText = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+  // Search and filter through all sections
+  const filteredChapters = SPEC_CHAPTERS.map((ch) => {
+    const filteredSections = ch.sections.filter((s) => {
+      // Equipment filter
+      if (selectedEquipment !== 'all') {
+        const fullSecText = `${s.title} ${s.summary} ${s.content.join(' ')}`.toLowerCase();
+        if (selectedEquipment === 'fixed' && !fullSecText.includes('고정식')) return false;
+        if (selectedEquipment === 'mobile' && !fullSecText.includes('이동식')) return false;
+        if (selectedEquipment === 'vehicle' && !fullSecText.includes('차량탑재') && !fullSecText.includes('차량 탑재')) return false;
+        if (selectedEquipment === 'drone' && !fullSecText.includes('드론')) return false;
+        if (selectedEquipment === 'protocol' && !fullSecText.includes('프로토콜') && !fullSecText.includes('tcp/ip') && !fullSecText.includes('보안') && !fullSecText.includes('opcode')) return false;
+      }
+
+      // Query filter
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return (
+        s.title.toLowerCase().includes(q) ||
+        s.summary.toLowerCase().includes(q) ||
+        s.content.some((c) => c.toLowerCase().includes(q)) ||
+        s.keyStandards?.some((k) => k.label.toLowerCase().includes(q) || k.value.toLowerCase().includes(q)) ||
+        s.tables?.some((t) => t.title.toLowerCase().includes(q) || t.number.toLowerCase().includes(q))
+      );
+    });
+
+    return {
+      ...ch,
+      sections: filteredSections,
+    };
+  }).filter((ch) => ch.sections.length > 0);
+
+  const highlightText = (text: string, query: string) => {
+    if (!query.trim()) return text;
+    const parts = text.split(new RegExp(`(${query.trim()})`, 'gi'));
+    return (
+      <>
+        {parts.map((part, i) =>
+          part.toLowerCase() === query.trim().toLowerCase() ? (
+            <mark key={i} className="bg-amber-500/30 text-amber-200 px-1 py-0.5 rounded font-bold">
+              {part}
+            </mark>
+          ) : (
+            part
+          )
+        )}
+      </>
+    );
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Document Overview Banner */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6 mb-8 shadow-xs">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-slate-100">
+    <div className="space-y-6">
+      {/* Top Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-blue-600/20 text-blue-400 rounded-xl border border-blue-500/30">
+            <BookOpen className="w-6 h-6" />
+          </div>
           <div>
-            <div className="flex items-center gap-2 text-xs font-medium text-blue-700 mb-1.5">
-              <span className="font-mono tracking-wider bg-blue-50 px-2 py-0.5 rounded text-blue-700 font-semibold">
-                {DOCUMENT_META.standardNumber}
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              경찰규격서 전문 전자 열람관
+              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-mono">
+                {DOCUMENT_META.standardNumber} ({DOCUMENT_META.latestDate})
               </span>
-              <span>·</span>
-              <span>{DOCUMENT_META.authority}</span>
-              <span>·</span>
-              <span>최신 개정일 {DOCUMENT_META.latestDate}</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-              {DOCUMENT_META.title}
-            </h1>
-            <p className="text-sm text-slate-500 mt-1 font-mono">
-              {DOCUMENT_META.englishTitle}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={() => setShowRevisionHistory(!showRevisionHistory)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-            >
-              <Calendar className="w-4 h-4 text-slate-500" />
-              <span>연혁 및 개정 이력 ({DOCUMENT_META.revisionHistory.length}회)</span>
-            </button>
-            <button
-              onClick={onOpenPdf}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-xs"
-            >
-              <BookOpen className="w-4 h-4" />
-              <span>원문 규격서 열람</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Legal Basis & Quick Stats Strip */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 text-xs">
-          <div>
-            <span className="text-slate-400 block mb-0.5">법적 근거</span>
-            <span className="font-semibold text-slate-800">{DOCUMENT_META.legalBasis}</span>
-          </div>
-          <div>
-            <span className="text-slate-400 block mb-0.5">단속 대상 기능</span>
-            <span className="font-semibold text-slate-800">속도·신호·꼬리물기 등 11종</span>
-          </div>
-          <div>
-            <span className="text-slate-400 block mb-0.5">통신 프로토콜</span>
-            <span className="font-semibold text-slate-800 font-mono">TCP/IP (Big-Endian, 포트 8701~8804)</span>
-          </div>
-          <div>
-            <span className="text-slate-400 block mb-0.5">공인 시험 기관</span>
-            <span className="font-semibold text-slate-800">한국도로교통공단 / KOLAS 인정기관</span>
-          </div>
-        </div>
-
-        {/* Revision History Collapsible */}
-        {showRevisionHistory && (
-          <div className="mt-6 pt-6 border-t border-slate-100 bg-slate-50 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                경찰규격서 제정 및 개정 연월일 이력
-              </h4>
-              <span className="text-xs text-slate-500">1998년 최초 제정 ~ 2026년 최신 개정</span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-              {DOCUMENT_META.revisionHistory.map((rev, idx) => (
-                <div
-                  key={idx}
-                  className="bg-white border border-slate-200 rounded p-2 text-xs"
-                >
-                  <span className="font-mono font-medium text-slate-900 block">{rev.date}</span>
-                  <span className="text-slate-500 text-[11px] block mt-0.5">{rev.note}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Main Search Bar */}
-      <div className="relative mb-6">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="규격서 조항, 성능기준, 프로토콜, 표 검색 (예: 안전모, 꼬리물기, 0x21, 챔버, 보도통행, 표 6...)"
-          className="w-full pl-11 pr-24 py-3 bg-white border border-slate-200 rounded-xl text-sm placeholder-slate-400 focus:outline-hidden focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all shadow-2xs"
-        />
-        {searchQuery && (
-          <button
-            onClick={() => setSearchQuery('')}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded"
-          >
-            검색 초기화
-          </button>
-        )}
-      </div>
-
-      {/* Search Results Display */}
-      {searchResults !== null ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-6 mb-8">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
-            <h3 className="text-sm font-bold text-slate-900">
-              '{searchQuery}' 검색 결과 ({searchResults.length}건)
-            </h3>
-            <span className="text-xs text-slate-400">결과 클릭 시 해당 조항으로 즉시 이동합니다</span>
-          </div>
-          {searchResults.length === 0 ? (
-            <p className="text-sm text-slate-500 py-6 text-center">검색 결과가 없습니다.</p>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {searchResults.map((res, i) => (
-                <div
-                  key={i}
-                  onClick={() => {
-                    setSelectedChapterId(res.chapter.id);
-                    setSelectedSectionId(res.section.id);
-                    setSearchQuery('');
-                  }}
-                  className="py-3 cursor-pointer hover:bg-blue-50/50 -mx-3 px-3 rounded-lg transition-colors"
-                >
-                  <div className="flex items-center gap-2 text-xs text-blue-600 font-medium mb-1">
-                    <span>{res.chapter.number}. {res.chapter.title}</span>
-                    <span>➔</span>
-                    <span className="font-semibold text-slate-800">{res.section.number}. {res.section.title}</span>
-                  </div>
-                  <p className="text-xs text-slate-500 mb-1">{res.section.summary}</p>
-                  <div className="space-y-1">
-                    {res.matches.map((m, mi) => (
-                      <p key={mi} className="text-xs text-slate-700 bg-slate-50 rounded px-2 py-1 font-mono">
-                        {m}
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : null}
-
-      {/* Two Column Layout: Navigation on Left, Article Content on Right */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column: Chapters & Sections Directory */}
-        <aside className="lg:col-span-4 bg-white rounded-xl border border-slate-200 p-4 shadow-xs sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
-            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-blue-600" />
-              규격서 목차 네비게이션
-            </h3>
-            <span className="text-xs text-slate-400">{SPEC_CHAPTERS.length}개 장</span>
-          </div>
-
-          <div className="space-y-3">
-            {SPEC_CHAPTERS.map((chapter) => {
-              const isChapterSelected = chapter.id === selectedChapterId;
-              return (
-                <div key={chapter.id} className="border border-slate-100 rounded-lg overflow-hidden">
-                  <button
-                    onClick={() => {
-                      setSelectedChapterId(chapter.id);
-                      setSelectedSectionId(chapter.sections[0].id);
-                    }}
-                    className={`w-full text-left px-3 py-2.5 text-xs font-semibold flex items-center justify-between transition-colors ${
-                      isChapterSelected
-                        ? 'bg-slate-900 text-white'
-                        : 'bg-slate-50 text-slate-800 hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="truncate pr-2">
-                      {chapter.number}. {chapter.title}
-                    </span>
-                    <ChevronRight
-                      className={`w-3.5 h-3.5 shrink-0 transition-transform ${
-                        isChapterSelected ? 'rotate-90 text-blue-400' : 'text-slate-400'
-                      }`}
-                    />
-                  </button>
-
-                  {isChapterSelected && (
-                    <div className="divide-y divide-slate-100 bg-white">
-                      {chapter.sections.map((section) => {
-                        const isSectionSelected = section.id === selectedSectionId;
-                        const isBookmarked = bookmarks.includes(section.id);
-                        return (
-                          <div
-                            key={section.id}
-                            className={`flex items-center justify-between px-3 py-2 text-xs transition-colors cursor-pointer ${
-                              isSectionSelected
-                                ? 'bg-blue-50 text-blue-700 font-semibold'
-                                : 'text-slate-600 hover:bg-slate-50'
-                            }`}
-                            onClick={() => setSelectedSectionId(section.id)}
-                          >
-                            <span className="truncate pr-2">
-                              {section.number}. {section.title}
-                            </span>
-                            <div className="flex items-center gap-1 shrink-0">
-                              {section.tables && (
-                                <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
-                                  표
-                                </span>
-                              )}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleBookmark(section.id);
-                                }}
-                                className="text-slate-400 hover:text-amber-500 p-0.5"
-                                title="북마크"
-                              >
-                                {isBookmarked ? (
-                                  <BookmarkCheck className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                                ) : (
-                                  <Bookmark className="w-3.5 h-3.5" />
-                                )}
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Quick Shortcuts to Interactive Tools */}
-          <div className="mt-6 pt-4 border-t border-slate-100 space-y-2">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-              연계 전문 분석기
-            </span>
-            <button
-              onClick={() => onNavigateToTab('calculator')}
-              className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 bg-slate-50 hover:bg-blue-50 hover:text-blue-700 rounded-md transition-colors flex items-center justify-between"
-            >
-              <span>성능검사 판정 계산기 (1~5년차)</span>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-            </button>
-            <button
-              onClick={() => onNavigateToTab('protocol')}
-              className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 bg-slate-50 hover:bg-blue-50 hover:text-blue-700 rounded-md transition-colors flex items-center justify-between"
-            >
-              <span>TCP/IP 패킷 & 파일명 분석기</span>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-            </button>
-            <button
-              onClick={() => onNavigateToTab('durability')}
-              className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 bg-slate-50 hover:bg-blue-50 hover:text-blue-700 rounded-md transition-colors flex items-center justify-between"
-            >
-              <span>16시간 챔버 환경시험 프로파일</span>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-            </button>
-          </div>
-        </aside>
-
-        {/* Right Column: Article Reading View */}
-        <main className="lg:col-span-8 bg-white rounded-xl border border-slate-200 p-6 lg:p-8 shadow-xs">
-          {/* Section Breadcrumb & Actions */}
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
-            <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-              <span className="text-slate-800">{currentChapter.number}. {currentChapter.title}</span>
-              <span>/</span>
-              <span className="text-blue-600 font-semibold">{currentSection.number}. {currentSection.title}</span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => toggleBookmark(currentSection.id)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-slate-900 border border-slate-200 rounded-md hover:bg-slate-50 transition-colors"
-              >
-                {bookmarks.includes(currentSection.id) ? (
-                  <>
-                    <BookmarkCheck className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                    <span>북마크됨</span>
-                  </>
-                ) : (
-                  <>
-                    <Bookmark className="w-3.5 h-3.5" />
-                    <span>북마크</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                onClick={() =>
-                  handleCopyText(
-                    `${currentSection.title}\n${currentSection.summary}\n\n${currentSection.content.join('\n')}`,
-                    currentSection.id
-                  )
-                }
-                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-slate-900 border border-slate-200 rounded-md hover:bg-slate-50 transition-colors"
-                title="조항 내용 복사"
-              >
-                {copiedId === currentSection.id ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>복사 완료</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5" />
-                    <span>복사</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Section Heading */}
-          <div className="mb-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-              {currentSection.number}. {currentSection.title}
             </h2>
-            <p className="text-sm text-slate-600 mt-2 bg-slate-50 border border-slate-200/80 rounded-lg p-3">
-              {currentSection.summary}
+            <p className="text-xs text-slate-400">
+              총 6개 장 및 부록 2종, 210쪽 분량의 최신 개정 기술규격을 조항별로 정밀 조회합니다.
             </p>
           </div>
+        </div>
 
-          {/* Key Standards Callout if any */}
-          {currentSection.keyStandards && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-              {currentSection.keyStandards.map((ks, i) => (
-                <div key={i} className="bg-blue-50/50 border border-blue-100 rounded-lg p-3 text-xs">
-                  <span className="text-blue-800 font-semibold block">{ks.label}</span>
-                  <span className="text-slate-900 font-mono mt-0.5 block">{ks.value}</span>
-                  {ks.note && <span className="text-slate-500 text-[11px] block mt-0.5">{ks.note}</span>}
-                </div>
-              ))}
-            </div>
-          )}
+        <button
+          onClick={onOpenPdf}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 shadow transition"
+        >
+          <ExternalLink className="w-4 h-4 text-blue-400" />
+          경찰청 원문 PDF 열람 (210쪽)
+        </button>
+      </div>
 
-          {/* Text Content */}
-          <div className="space-y-4 text-sm leading-relaxed text-slate-800 font-sans mb-8">
-            {currentSection.content.map((paragraph, idx) => (
-              <p key={idx} className="text-justify">
-                {paragraph}
-              </p>
+      {/* Main Grid: Sidebar & Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left Index (4 cols) */}
+        <div className="lg:col-span-4 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col h-[750px]">
+          {/* Equipment Category Filter Chips */}
+          <div className="flex flex-wrap items-center gap-1 mb-2.5">
+            {EQUIPMENT_TAGS.map((opt) => (
+              <button
+                key={opt.id}
+                onClick={() => setSelectedEquipment(opt.id)}
+                className={`px-2 py-1 rounded-md text-[11px] font-semibold transition ${
+                  selectedEquipment === opt.id
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-slate-950 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`}
+              >
+                {opt.label}
+              </button>
             ))}
           </div>
 
-          {/* Section Tables */}
-          {currentSection.tables && currentSection.tables.length > 0 && (
-            <div className="space-y-6 mb-8">
-              {currentSection.tables.map((table) => (
-                <div key={table.id} className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
-                  <div className="bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between">
-                    <span className="text-xs font-bold tracking-wide flex items-center gap-1.5">
-                      <TableIcon className="w-4 h-4 text-blue-400" />
-                      {table.number} : {table.title}
+          {/* Search Input */}
+          <div className="relative mb-2">
+            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="조항, 단어 실시간 검색 (예: 갓길, 레이더, 암호화)..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 bg-slate-950 border border-slate-700 focus:border-blue-500 rounded-lg text-xs text-white focus:outline-none transition"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-2.5 p-0.5 text-slate-400 hover:text-white"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Suggested keyword chips */}
+          <div className="flex flex-wrap items-center gap-1 mb-3">
+            <span className="text-[10px] text-slate-500 flex items-center gap-0.5">
+              <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+              추천:
+            </span>
+            {SUGGESTED_KEYWORDS.slice(0, 5).map((kw) => (
+              <button
+                key={kw}
+                onClick={() => setSearchQuery(kw)}
+                className="text-[10px] px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800/80 text-slate-400 hover:text-blue-300"
+              >
+                {kw}
+              </button>
+            ))}
+          </div>
+
+          {/* Chapter & Section List */}
+          <div className="flex-1 overflow-y-auto space-y-3 pr-1 no-scrollbar">
+            {filteredChapters.length > 0 ? (
+              filteredChapters.map((ch) => (
+                <div key={ch.id} className="space-y-1">
+                  <div
+                    onClick={() => {
+                      setSelectedChapterId(ch.id);
+                      if (ch.sections[0]) setSelectedSectionId(ch.sections[0].id);
+                    }}
+                    className={`px-3 py-2 rounded-lg text-xs font-bold cursor-pointer transition flex items-center justify-between ${
+                      selectedChapterId === ch.id
+                        ? 'bg-blue-600/20 text-blue-300 border border-blue-500/40'
+                        : 'text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="truncate">
+                      {ch.number}. {ch.title}
                     </span>
-                    <span className="text-[11px] text-slate-400 font-mono">경찰청 규격</span>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      {ch.sections.length}절
+                    </span>
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-slate-200 text-xs">
-                      <thead className="bg-slate-50 font-semibold text-slate-700">
+
+                  {/* Sub sections if active chapter or searching */}
+                  {(selectedChapterId === ch.id || searchQuery.trim() || selectedEquipment !== 'all') && (
+                    <div className="pl-3 space-y-1 border-l-2 border-slate-800 ml-2">
+                      {ch.sections.map((sec) => (
+                        <div
+                          key={sec.id}
+                          onClick={() => {
+                            setSelectedChapterId(ch.id);
+                            setSelectedSectionId(sec.id);
+                          }}
+                          className={`px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition flex items-center justify-between ${
+                            selectedSectionId === sec.id
+                              ? 'bg-blue-600 text-white font-semibold shadow'
+                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                          }`}
+                        >
+                          <span className="truncate">
+                            {sec.number} {sec.title}
+                          </span>
+                          {bookmarkedSections.includes(sec.id) && (
+                            <Bookmark className="w-3 h-3 text-amber-400 fill-current flex-shrink-0" />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="py-12 text-center text-xs text-slate-500">
+                일치하는 조항이 없습니다.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Section Content (8 cols) */}
+        <div
+          className={`lg:col-span-8 bg-slate-900/90 border rounded-2xl p-6 shadow-xl h-[750px] overflow-y-auto space-y-6 transition-all ${
+            highlightPulse
+              ? 'border-blue-500 ring-2 ring-blue-500/40 bg-slate-900'
+              : 'border-slate-800'
+          }`}
+        >
+          {activeSection ? (
+            <div className="space-y-6">
+              {/* Target Highlight Banner */}
+              {highlightPulse && (
+                <div className="p-3 bg-blue-600/20 border border-blue-500/40 rounded-xl flex items-center justify-between text-xs text-blue-200 animate-pulse">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-blue-400" />
+                    <span>성능검사 계산기에서 선택한 규격 조항이 로드되었습니다.</span>
+                  </div>
+                  <span className="text-[10px] font-mono bg-blue-500/30 px-2 py-0.5 rounded">
+                    {activeSection.number}
+                  </span>
+                </div>
+              )}
+
+              {/* Section Header */}
+              <div className="flex items-start justify-between pb-4 border-b border-slate-800">
+                <div>
+                  <div className="flex items-center gap-2 text-xs font-semibold text-blue-400 mb-1">
+                    <span>{activeChapter.number}. {activeChapter.title}</span>
+                    <ChevronRight className="w-3 h-3 text-slate-500" />
+                    <span>{activeSection.number}</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-white tracking-tight">
+                    {highlightText(activeSection.title, searchQuery)}
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {highlightText(activeSection.summary, searchQuery)}
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => toggleBookmark(activeSection.id)}
+                  className={`p-2 rounded-lg border transition ${
+                    bookmarkedSections.includes(activeSection.id)
+                      ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                      : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+                  }`}
+                  title="중요 조항 책갈피"
+                >
+                  <Bookmark
+                    className={`w-4 h-4 ${
+                      bookmarkedSections.includes(activeSection.id) ? 'fill-current' : ''
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Key Standards Summary Badges if any */}
+              {activeSection.keyStandards && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {activeSection.keyStandards.map((std, i) => (
+                    <div
+                      key={i}
+                      className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 flex items-start gap-2.5"
+                    >
+                      <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <div className="text-[11px] text-slate-400 font-medium">
+                          {highlightText(std.label, searchQuery)}
+                        </div>
+                        <div className="text-sm font-bold text-white font-mono mt-0.5">
+                          {highlightText(std.value, searchQuery)}
+                        </div>
+                        {std.note && (
+                          <div className="text-[10px] text-slate-500 mt-0.5">
+                            {highlightText(std.note, searchQuery)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Paragraphs */}
+              <div className="space-y-3 text-xs sm:text-sm text-slate-300 leading-relaxed">
+                {activeSection.content.map((paragraph, idx) => (
+                  <p key={idx} className="bg-slate-950/30 p-3 rounded-lg border border-slate-800/60">
+                    {highlightText(paragraph, searchQuery)}
+                  </p>
+                ))}
+              </div>
+
+              {/* Tables if any */}
+              {activeSection.tables && activeSection.tables.map((tbl) => (
+                <div key={tbl.id} className="space-y-2 pt-2">
+                  <div className="flex items-center gap-2">
+                    <Table className="w-4 h-4 text-blue-400" />
+                    <h4 className="text-xs font-bold text-white">
+                      (표 {tbl.number}) {highlightText(tbl.title, searchQuery)}
+                    </h4>
+                  </div>
+                  <div className="overflow-x-auto rounded-lg border border-slate-800">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-800/80 text-slate-300 font-semibold border-b border-slate-700">
                         <tr>
-                          {table.headers.map((h, hi) => (
-                            <th key={hi} className="px-4 py-2.5 text-left border-r last:border-r-0 border-slate-200 whitespace-nowrap">
+                          {tbl.headers.map((h, i) => (
+                            <th key={i} className="py-2.5 px-3 whitespace-nowrap">
                               {h}
                             </th>
                           ))}
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100 bg-white">
-                        {table.rows.map((row, ri) => (
-                          <tr key={ri} className="hover:bg-slate-50/70 transition-colors">
-                            {row.map((cell, ci) => (
-                              <td key={ci} className="px-4 py-2.5 text-slate-800 border-r last:border-r-0 border-slate-100">
-                                {cell}
+                      <tbody className="divide-y divide-slate-800 text-slate-300">
+                        {tbl.rows.map((row, rIdx) => (
+                          <tr key={rIdx} className="hover:bg-slate-800/30 transition">
+                            {row.map((cell, cIdx) => (
+                              <td key={cIdx} className="py-2 px-3">
+                                {typeof cell === 'string'
+                                  ? highlightText(cell, searchQuery)
+                                  : cell}
                               </td>
                             ))}
                           </tr>
@@ -463,59 +409,18 @@ export const SpecificationViewer: React.FC<SpecificationViewerProps> = ({
                       </tbody>
                     </table>
                   </div>
-                  {table.note && (
-                    <div className="px-4 py-2 bg-slate-50 text-[11px] text-slate-500 border-t border-slate-200">
-                      {table.note}
-                    </div>
+                  {tbl.note && (
+                    <p className="text-[11px] text-slate-500 italic">* {highlightText(tbl.note, searchQuery)}</p>
                   )}
                 </div>
               ))}
             </div>
+          ) : (
+            <div className="text-center py-24 text-slate-500">
+              조항을 선택해 주십시오.
+            </div>
           )}
-
-          {/* Next / Previous Section Navigation */}
-          <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
-            <button
-              onClick={() => {
-                const allSections = SPEC_CHAPTERS.flatMap((c) => c.sections);
-                const curIdx = allSections.findIndex((s) => s.id === currentSection.id);
-                if (curIdx > 0) {
-                  const prevSec = allSections[curIdx - 1];
-                  const ch = SPEC_CHAPTERS.find((c) => c.sections.some((s) => s.id === prevSec.id));
-                  if (ch) {
-                    setSelectedChapterId(ch.id);
-                    setSelectedSectionId(prevSec.id);
-                  }
-                }
-              }}
-              className="text-xs text-slate-600 hover:text-slate-900 font-medium px-3 py-1.5 rounded-md hover:bg-slate-100 transition-colors"
-            >
-              ← 이전 조항
-            </button>
-
-            <span className="text-xs text-slate-400 font-mono">
-              {currentSection.number} / {currentChapter.sections.length}
-            </span>
-
-            <button
-              onClick={() => {
-                const allSections = SPEC_CHAPTERS.flatMap((c) => c.sections);
-                const curIdx = allSections.findIndex((s) => s.id === currentSection.id);
-                if (curIdx < allSections.length - 1) {
-                  const nextSec = allSections[curIdx + 1];
-                  const ch = SPEC_CHAPTERS.find((c) => c.sections.some((s) => s.id === nextSec.id));
-                  if (ch) {
-                    setSelectedChapterId(ch.id);
-                    setSelectedSectionId(nextSec.id);
-                  }
-                }
-              }}
-              className="text-xs text-blue-600 hover:text-blue-800 font-medium px-3 py-1.5 rounded-md hover:bg-blue-50 transition-colors"
-            >
-              다음 조항 →
-            </button>
-          </div>
-        </main>
+        </div>
       </div>
     </div>
   );
